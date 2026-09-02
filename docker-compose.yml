@@ -1,0 +1,87 @@
+name: axiom-imaging
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: axiom
+      POSTGRES_USER: axiom
+      POSTGRES_PASSWORD: axiom
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U axiom -d axiom"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  orthanc:
+    image: orthancteam/orthanc:26.8.2
+    environment:
+      ORTHANC__NAME: Axiom Imaging PACS
+      ORTHANC__REMOTE_ACCESS_ALLOWED: "true"
+      ORTHANC__AUTHENTICATION_ENABLED: "true"
+      ORTHANC__REGISTERED_USERS: '{"axiom":"${ORTHANC_PASSWORD}"}'
+      DICOM_WEB_PLUGIN_ENABLED: "true"
+      OHIF_PLUGIN_ENABLED: "true"
+      ORTHANC__DICOM_WEB__ENABLE: "true"
+      ORTHANC__OHIF__DATA_SOURCE: dicom-web
+    ports:
+      - "8042:8042"
+      - "4242:4242"
+    volumes:
+      - orthanc_data:/var/lib/orthanc/db
+    healthcheck:
+      test: ["CMD", "python3", "/probes/test-aliveness.py"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  device-engine:
+    build:
+      context: ./services/device-engine
+    expose:
+      - "9300"
+    healthcheck:
+      test: ["CMD-SHELL", "timeout 2 bash -c '</dev/tcp/127.0.0.1/9300' || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build:
+      context: ./apps/api
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://axiom:axiom@postgres:5432/axiom
+      ORTHANC_URL: http://orthanc:8042
+      ORTHANC_PUBLIC_URL: http://localhost:8042
+      DEVICE_ENGINE_HOST: device-engine
+      DEVICE_ENGINE_PORT: 9300
+    command: ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"]
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      orthanc:
+        condition: service_healthy
+      device-engine:
+        condition: service_healthy
+
+  web:
+    build:
+      context: ./apps/web
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+      NEXT_PUBLIC_ORTHANC_URL: http://localhost:8042
+      NEXT_PUBLIC_GITHUB_URL: https://github.com/Rishikeshsanin/axiom-imaging
+      AXIOM_INTERNAL_API_URL: http://api:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+
+volumes:
+  postgres_data:
+  orthanc_data:

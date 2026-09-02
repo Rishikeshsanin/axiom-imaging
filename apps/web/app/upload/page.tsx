@@ -39,7 +39,7 @@ export default function UploadPage() {
 
   return (
     <>
-      <PageHeader title="Upload DICOM Study" description="Upload de-identified .dcm/.dicom files. Axiom reads the actual DICOM metadata, checks duplicate SOP Instance UIDs, stores objects through Orthanc, maps them into the patient/study hierarchy and runs the Axiom Quality Gate." />
+      <PageHeader title="Upload DICOM Study" description="Upload synthetic or de-identified .dcm/.dicom files. Axiom reads the actual DICOM metadata, checks duplicate SOP Instance UIDs, persists the study through the configured imaging backend (Orthanc in the full local PACS deployment; an isolated hosted adapter in this public demo), maps it into the patient/study hierarchy and runs the Axiom Quality Gate." />
 
       <div className="grid gap-5 xl:grid-cols-[0.85fr_1.15fr]">
         <section className="rounded-xl border border-slate-200 bg-white p-6">

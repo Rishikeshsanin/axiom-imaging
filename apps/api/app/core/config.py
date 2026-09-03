@@ -13,6 +13,8 @@ class Settings:
     database_url: str = os.getenv(
         "DATABASE_URL", "postgresql+psycopg://axiom:axiom@localhost:5432/axiom"
     )
+    database_schema: str = os.getenv("AXIOM_DB_SCHEMA", "").strip()
+    database_table_prefix: str = os.getenv("AXIOM_DB_TABLE_PREFIX", "").strip()
     orthanc_url: str = os.getenv("ORTHANC_URL", "http://localhost:8042").rstrip("/")
     orthanc_public_url: str = os.getenv("ORTHANC_PUBLIC_URL", "http://localhost:8042").rstrip("/")
     orthanc_username: str = os.getenv("ORTHANC_USERNAME", "axiom")

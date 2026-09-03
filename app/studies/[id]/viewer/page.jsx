@@ -107,19 +107,15 @@ export default function HostedDicomViewerPage() {
   const [instances, setInstances] = useState([]);
   const [index, setIndex] = useState(0);
   const [study, setStudy] = useState(null);
+  const [loadedStudyId, setLoadedStudyId] = useState(null);
   const [info, setInfo] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [sliceLoading, setSliceLoading] = useState(false);
+  const [renderedInstanceId, setRenderedInstanceId] = useState(null);
   const [error, setError] = useState(null);
 
   useEffect(() => {
     if (!studyId) return;
     let cancelled = false;
     async function loadStudy() {
-      await Promise.resolve();
-      if (cancelled) return;
-      setLoading(true);
-      setError(null);
       try {
         const [studyResponse, instanceResponse] = await Promise.all([
           fetch(`${API}/api/studies/${encodeURIComponent(studyId)}`, { cache: "no-store" }),
@@ -132,11 +128,12 @@ export default function HostedDicomViewerPage() {
           setStudy(nextStudy);
           setInstances(nextInstances);
           setIndex(0);
+          setError(null);
         }
       } catch (cause) {
         if (!cancelled) setError(cause instanceof Error ? cause.message : "Could not load study.");
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) setLoadedStudyId(studyId);
       }
     }
     loadStudy();
@@ -148,19 +145,20 @@ export default function HostedDicomViewerPage() {
     if (!current || !canvasRef.current) return;
     let cancelled = false;
     async function loadSlice() {
-      await Promise.resolve();
-      if (cancelled) return;
-      setSliceLoading(true);
-      setError(null);
       try {
         const response = await fetch(`${API}/api/instances/${encodeURIComponent(current.id)}/dicom`, { cache: "no-store" });
         if (!response.ok) throw new Error(`DICOM instance request failed (${response.status}).`);
         const bytes = new Uint8Array(await response.arrayBuffer());
-        if (!cancelled && canvasRef.current) setInfo(drawDicom(canvasRef.current, bytes));
+        if (!cancelled && canvasRef.current) {
+          setInfo(drawDicom(canvasRef.current, bytes));
+          setRenderedInstanceId(current.id);
+          setError(null);
+        }
       } catch (cause) {
-        if (!cancelled) setError(cause instanceof Error ? cause.message : "Could not render DICOM slice.");
-      } finally {
-        if (!cancelled) setSliceLoading(false);
+        if (!cancelled) {
+          setRenderedInstanceId(current.id);
+          setError(cause instanceof Error ? cause.message : "Could not render DICOM slice.");
+        }
       }
     }
     loadSlice();
@@ -168,6 +166,8 @@ export default function HostedDicomViewerPage() {
   }, [current]);
 
   const title = useMemo(() => study?.study_description || "Hosted DICOM viewer", [study]);
+  const loading = Boolean(studyId) && loadedStudyId !== studyId;
+  const sliceLoading = Boolean(current) && renderedInstanceId !== current.id;
 
   if (loading) {
     return <div className="grid min-h-[65vh] place-items-center"><div className="flex items-center gap-2 text-sm text-slate-600"><LoaderCircle className="animate-spin" size={18} />Loading hosted study…</div></div>;

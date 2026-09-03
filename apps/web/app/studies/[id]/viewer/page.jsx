@@ -116,6 +116,8 @@ export default function HostedDicomViewerPage() {
     if (!studyId) return;
     let cancelled = false;
     async function loadStudy() {
+      await Promise.resolve();
+      if (cancelled) return;
       setLoading(true);
       setError(null);
       try {
@@ -146,6 +148,8 @@ export default function HostedDicomViewerPage() {
     if (!current || !canvasRef.current) return;
     let cancelled = false;
     async function loadSlice() {
+      await Promise.resolve();
+      if (cancelled) return;
       setSliceLoading(true);
       setError(null);
       try {

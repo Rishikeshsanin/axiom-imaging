@@ -7,6 +7,7 @@ from sqlalchemy import JSON, Date, DateTime, ForeignKey, Integer, String, Text, 
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.core.config import settings
 from app.core.database import Base
 
 JSON_DOCUMENT = JSON().with_variant(JSONB, "postgresql")
@@ -16,8 +17,19 @@ def uuid_str() -> str:
     return str(uuid.uuid4())
 
 
+def table_name(name: str) -> str:
+    return f"{settings.database_table_prefix}{name}"
+
+
+def foreign_key(table: str) -> str:
+    target = table_name(table)
+    if settings.database_schema:
+        return f"{settings.database_schema}.{target}.id"
+    return f"{target}.id"
+
+
 class Patient(Base):
-    __tablename__ = "patients"
+    __tablename__ = table_name("patients")
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
     patient_identifier: Mapped[str] = mapped_column(String(128), unique=True, index=True)
@@ -31,27 +43,27 @@ class Patient(Base):
 
 
 class ImagingOrder(Base):
-    __tablename__ = "imaging_orders"
+    __tablename__ = table_name("imaging_orders")
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
-    patient_id: Mapped[str] = mapped_column(ForeignKey("patients.id"), index=True)
+    patient_id: Mapped[str] = mapped_column(ForeignKey(foreign_key("patients")), index=True)
     requested_modality: Mapped[str] = mapped_column(String(32))
     body_part: Mapped[str | None] = mapped_column(String(128), nullable=True)
     priority: Mapped[str] = mapped_column(String(32), default="ROUTINE")
     requested_by: Mapped[str] = mapped_column(String(255))
     status: Mapped[str] = mapped_column(String(32), default="ORDERED")
-    scheduled_device_id: Mapped[str | None] = mapped_column(ForeignKey("devices.id"), nullable=True)
+    scheduled_device_id: Mapped[str | None] = mapped_column(ForeignKey(foreign_key("devices")), nullable=True)
     requested_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     scheduled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
 class Study(Base):
-    __tablename__ = "studies"
+    __tablename__ = table_name("studies")
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
-    patient_id: Mapped[str] = mapped_column(ForeignKey("patients.id"), index=True)
-    imaging_order_id: Mapped[str | None] = mapped_column(ForeignKey("imaging_orders.id"), nullable=True)
+    patient_id: Mapped[str] = mapped_column(ForeignKey(foreign_key("patients")), index=True)
+    imaging_order_id: Mapped[str | None] = mapped_column(ForeignKey(foreign_key("imaging_orders")), nullable=True)
     study_instance_uid: Mapped[str] = mapped_column(String(255), unique=True, index=True)
     orthanc_study_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
     study_date: Mapped[date | None] = mapped_column(Date, nullable=True)
@@ -79,10 +91,10 @@ class Study(Base):
 
 
 class Series(Base):
-    __tablename__ = "series"
+    __tablename__ = table_name("series")
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
-    study_id: Mapped[str] = mapped_column(ForeignKey("studies.id"), index=True)
+    study_id: Mapped[str] = mapped_column(ForeignKey(foreign_key("studies")), index=True)
     series_instance_uid: Mapped[str] = mapped_column(String(255), unique=True, index=True)
     orthanc_series_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
     series_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
@@ -95,10 +107,10 @@ class Series(Base):
 
 
 class Instance(Base):
-    __tablename__ = "instances"
+    __tablename__ = table_name("instances")
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
-    series_id: Mapped[str] = mapped_column(ForeignKey("series.id"), index=True)
+    series_id: Mapped[str] = mapped_column(ForeignKey(foreign_key("series")), index=True)
     sop_instance_uid: Mapped[str] = mapped_column(String(255), unique=True, index=True)
     orthanc_instance_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
     instance_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
@@ -110,7 +122,7 @@ class Instance(Base):
 
 
 class Device(Base):
-    __tablename__ = "devices"
+    __tablename__ = table_name("devices")
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
     device_identifier: Mapped[str] = mapped_column(String(128), unique=True, index=True)
@@ -127,12 +139,12 @@ class Device(Base):
 
 
 class WorkflowEvent(Base):
-    __tablename__ = "workflow_events"
+    __tablename__ = table_name("workflow_events")
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
-    study_id: Mapped[str | None] = mapped_column(ForeignKey("studies.id"), nullable=True, index=True)
-    order_id: Mapped[str | None] = mapped_column(ForeignKey("imaging_orders.id"), nullable=True)
-    device_id: Mapped[str | None] = mapped_column(ForeignKey("devices.id"), nullable=True)
+    study_id: Mapped[str | None] = mapped_column(ForeignKey(foreign_key("studies")), nullable=True, index=True)
+    order_id: Mapped[str | None] = mapped_column(ForeignKey(foreign_key("imaging_orders")), nullable=True)
+    device_id: Mapped[str | None] = mapped_column(ForeignKey(foreign_key("devices")), nullable=True)
     event_type: Mapped[str] = mapped_column(String(128), index=True)
     message: Mapped[str] = mapped_column(Text)
     event_metadata: Mapped[dict] = mapped_column("metadata", JSON_DOCUMENT, default=dict)
@@ -140,7 +152,7 @@ class WorkflowEvent(Base):
 
 
 class Alert(Base):
-    __tablename__ = "alerts"
+    __tablename__ = table_name("alerts")
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
     severity: Mapped[str] = mapped_column(String(32))
@@ -154,10 +166,10 @@ class Alert(Base):
 
 
 class Report(Base):
-    __tablename__ = "reports"
+    __tablename__ = table_name("reports")
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
-    study_id: Mapped[str] = mapped_column(ForeignKey("studies.id"), unique=True)
+    study_id: Mapped[str] = mapped_column(ForeignKey(foreign_key("studies")), unique=True)
     draft_text: Mapped[str] = mapped_column(Text, default="")
     status: Mapped[str] = mapped_column(String(32), default="DRAFT")
     created_by: Mapped[str | None] = mapped_column(String(255), nullable=True)
@@ -166,7 +178,7 @@ class Report(Base):
 
 
 class AuditEvent(Base):
-    __tablename__ = "audit_events"
+    __tablename__ = table_name("audit_events")
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
     actor: Mapped[str | None] = mapped_column(String(255), nullable=True)

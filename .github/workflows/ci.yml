@@ -35,7 +35,21 @@ jobs:
           node-version: "22"
       - run: npm install
       - run: npm run typecheck
-      - run: npm run lint
+      - name: Lint frontend
+        shell: bash
+        run: |
+          set +e
+          npm run lint 2>&1 | tee /tmp/axiom-eslint.log
+          status=${PIPESTATUS[0]}
+          if [ "$status" -ne 0 ]; then
+            {
+              echo "### ESLint failure"
+              echo '```text'
+              cat /tmp/axiom-eslint.log
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+          exit "$status"
       - run: npm run build
 
   device-engine:

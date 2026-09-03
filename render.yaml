@@ -1,0 +1,32 @@
+services:
+  - type: web
+    name: axiom-imaging-core
+    runtime: docker
+    repo: https://github.com/Rishikeshsanin/axiom-imaging
+    branch: main
+    region: singapore
+    plan: 0.5c-512mb
+    dockerfilePath: ./infra/render/Dockerfile
+    dockerContext: .
+    autoDeployTrigger: checksPass
+    healthCheckPath: /healthz
+    maxShutdownDelaySeconds: 45
+    disk:
+      name: orthanc-data
+      mountPath: /var/lib/orthanc/db
+      sizeGB: 1
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: ORTHANC_PASSWORD
+        generateValue: true
+      - key: AXIOM_DB_SCHEMA
+        value: axiom_imaging
+      - key: AXIOM_DB_TABLE_PREFIX
+        value: core_
+      - key: AXIOM_CORS_ORIGINS
+        value: https://axiom-imaging.vercel.app
+      - key: AXIOM_MAX_UPLOAD_MB
+        value: "64"
+      - key: ORTHANC__NAME
+        value: Axiom Imaging PACS

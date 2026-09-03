@@ -39,13 +39,28 @@ jobs:
         shell: bash
         run: |
           set +e
-          npm run lint 2>&1 | tee /tmp/axiom-eslint.log
-          status=${PIPESTATUS[0]}
+          npx eslint . --format json > /tmp/axiom-eslint.json
+          status=$?
+          node <<'NODE'
+          const fs = require('fs');
+          const path = require('path');
+          const report = JSON.parse(fs.readFileSync('/tmp/axiom-eslint.json', 'utf8'));
+          const cwd = process.cwd();
+          for (const file of report) {
+            const relative = path.relative(cwd, file.filePath).replaceAll('\\', '/');
+            for (const item of file.messages) {
+              const level = item.severity === 2 ? 'error' : 'warning';
+              const title = item.ruleId ? `ESLint ${item.ruleId}` : 'ESLint';
+              const message = String(item.message).replaceAll('\n', '%0A').replaceAll('\r', '%0D');
+              console.log(`::${level} file=${relative},line=${item.line || 1},col=${item.column || 1},title=${title}::${message}`);
+            }
+          }
+          NODE
           if [ "$status" -ne 0 ]; then
             {
               echo "### ESLint failure"
-              echo '```text'
-              cat /tmp/axiom-eslint.log
+              echo '```json'
+              cat /tmp/axiom-eslint.json
               echo '```'
             } >> "$GITHUB_STEP_SUMMARY"
           fi

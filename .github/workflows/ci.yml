@@ -35,22 +35,7 @@ jobs:
           node-version: "22"
       - run: npm install
       - run: npm run typecheck
-      - name: Capture ESLint report
-        id: eslint
-        continue-on-error: true
-        run: npx eslint . --format json > eslint-report.json
-      - name: Upload ESLint report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: frontend-eslint-report
-          path: apps/web/eslint-report.json
-          if-no-files-found: error
-      - name: Enforce frontend lint
-        if: steps.eslint.outcome == 'failure'
-        run: |
-          echo "Frontend lint failed; report uploaded as frontend-eslint-report."
-          exit 1
+      - run: npm run lint
       - run: npm run build
 
   device-engine:
